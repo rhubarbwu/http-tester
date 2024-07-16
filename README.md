@@ -37,7 +37,7 @@ python tester.py <address> [-x HTTP_METHOD] [-t DURATION] [-to TIMEOUT] [-qps RA
    python http_load_tester.py github.com -t 60 -to 2 -q
    ```
 
-### Outputs from Makefile
+### Outputs from Makefile Tests
 
 ```sh
 python tester.py http://www.microsoft.com -t 1 -qps 100 -o -f results-ms

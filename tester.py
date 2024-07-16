@@ -8,6 +8,8 @@ from aiohttp.client import ClientSession, ClientTimeout
 
 
 class Tester:
+    """HTTP Load Testing Class -- reports error counts and latency statistics."""
+
     def __init__(
         self,
         address: str,
@@ -27,6 +29,7 @@ class Tester:
         self.logging = logging
 
     async def send_request(self, session: ClientSession):
+        """Send an HTTP request from client <session> of method setting."""
         try:
             start = time()
 
@@ -49,6 +52,9 @@ class Tester:
             self.n_requests += 1
 
     async def run(self):
+        """Run the load test by sending HTTP requests in a loop with either
+        random delay or pre-set duration (set in __init__).
+        """
         timeout = ClientTimeout(self.timeout if self.timeout else self.duration + 1)
         async with aiohttp.ClientSession(timeout=timeout) as session:
             tasks = []
@@ -68,6 +74,8 @@ class Tester:
             await asyncio.gather(*tasks)
 
     def report(self):
+        """Output a report of load test settings, error counts, and latency
+        statistics."""
         if not self.logging:
             return
 
@@ -85,6 +93,7 @@ class Tester:
         n_digits = len(str(self.n_requests))
         print(f" Success: {n_successes:>{n_digits}}/{self.n_requests}")
         print(f" Failure: {self.n_errors:>{n_digits}}/{self.n_requests}")
+        # rate percentage can be computed trivially; counts are more flexible
 
         print("\n**Latencies**")
         try:
@@ -96,6 +105,9 @@ class Tester:
             print("None recorded. Maybe timed out?")
 
     def write_to_json(self, output_file: str = None):
+        """Write results to file at path <output_file>.
+        Outputs warnings only if logging is enabled.
+        """
         import json
 
         if output_file is None:
