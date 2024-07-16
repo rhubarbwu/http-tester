@@ -1,7 +1,6 @@
 import asyncio
-from os.path import exists
 from random import uniform
-from statistics import mean
+from statistics import mean, stdev
 from time import time
 
 import aiohttp
@@ -13,23 +12,36 @@ class Tester:
         self,
         address: str,
         duration: int,
+        http_method: str = "GET",
         timeout: int = None,
         rate_limit: int = None,
+        logging: bool = True,
     ):
         self.address = address
+        self.http_method = http_method
         self.duration = duration
         self.timeout = timeout
         self.rate_limit = rate_limit
         self.latencies = []
         self.n_requests, self.n_errors = 0, 0
+        self.logging = logging
 
     async def send_request(self, session: ClientSession):
         try:
             start = time()
-            async with session.get(self.address) as response:
+
+            match self.http_method:
+                case "HEAD":
+                    session_func = session.head
+                case "OPT" | "OPTIONS":
+                    session_func = session.options
+                case "GET" | _:
+                    session_func = session.get
+
+            async with session_func(self.address) as response:
                 latency = time() - start
                 self.latencies.append(latency)
-                if response.status != 200:
+                if response.status not in [200, 204]:
                     self.n_errors += 1
         except Exception:
             self.n_errors += 1
@@ -56,14 +68,17 @@ class Tester:
             await asyncio.gather(*tasks)
 
     def report(self):
+        if not self.logging:
+            return
 
-        print("\n**Summary**")
-        print(f"   Address: {self.address}")
-        print(f"  Duration: {self.duration}s")
+        print("**Summary**")
+        print(f"    Address: {self.address}")
+        print(f"HTTP Method: {self.http_method}")
+        print(f"   Duration: {self.duration}s")
         if self.timeout:
-            print(f"   Timeout: {self.timeout}s")
+            print(f"    Timeout: {self.timeout}s")
         if self.rate_limit:
-            print(f" QPS Limit: {self.rate_limit}")
+            print(f"  QPS Limit: {self.rate_limit}")
 
         print("\n**Results**")
         n_successes = self.n_requests - self.n_errors
@@ -76,10 +91,9 @@ class Tester:
             print(" Min:", min(self.latencies))
             print(" Max:", max(self.latencies))
             print(" Avg:", mean(self.latencies))
+            print(" StD:", stdev(self.latencies))
         except Exception:
             print("None recorded. Maybe timed out?")
-
-        print()
 
     def write_to_json(self, output_file: str = None):
         import json
@@ -89,6 +103,7 @@ class Tester:
 
         results = {
             "address": self.address,
+            "http_method": self.http_method,
             "duration": self.duration,
             "rate_limit": self.rate_limit,
             "timeout": self.timeout,
@@ -100,18 +115,21 @@ class Tester:
             results["min_latency"] = min(self.latencies)
             results["max_latency"] = max(self.latencies)
             results["avg_latency"] = mean(self.latencies)
+            results["std_latency"] = stdev(self.latencies)
         except Exception:
             pass
 
         if not output_file.endswith(".json"):
-            print(f"Warning -- adding extension: {output_file}(.json)")
+            if self.logging:
+                print(f"\nWriting -- adding extension: {output_file}(.json)")
             output_file += ".json"
 
         try:
             with open(output_file, "w", encoding="utf-8") as f:
                 json.dump(results, f, ensure_ascii=False, indent=4)
         except Exception:
-            print(f"Can't write: file {output_file} may not exist.")
+            if self.logging:
+                print(f"\nCan't write: file {output_file} may not exist.")
 
 
 from argparse import ArgumentParser
@@ -120,6 +138,14 @@ from argparse import ArgumentParser
 def main():
     parser = ArgumentParser(description="HTTP Load Tester")
     parser.add_argument("address", type=str, help="Address to test.")
+    parser.add_argument(
+        "-x",
+        "--http_method",
+        type=str,
+        choices=["GET", "HEAD", "OPTIONS"],
+        default="GET",
+        help="Which HTTP request method to send. Default: GET.",
+    )
     parser.add_argument(
         "-t", "--duration", type=int, default=5, help="Duration of the test (seconds)."
     )
@@ -155,17 +181,28 @@ def main():
         "--output_file",
         type=str,
         default=None,
-        help="Path to JSON file to store results. Default: None (generate base on completion time).",
+        help="Path to JSON file to store results. Default: None (generate on completion time).",
     )
 
     args = parser.parse_args()
 
-    tester = Tester(args.address, args.duration, args.timeout, args.rate_limit)
+    tester = Tester(
+        args.address,
+        args.duration,
+        args.http_method,
+        args.timeout,
+        args.rate_limit,
+        not args.quiet,
+    )
     asyncio.run(tester.run())  # may be better way?
     if not args.quiet:
+        print("=" * 64)
         tester.report()
     if args.save_results or args.output_file:
         tester.write_to_json(args.output_file)
+    if not args.quiet:
+        print("=" * 64)
+        print()
 
 
 if __name__ == "__main__":
