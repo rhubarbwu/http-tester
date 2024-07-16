@@ -1,6 +1,6 @@
 # HTTP Load Tester
 
-Test HTTP endpoints by load and measuring performance metrics.
+Test HTTP endpoints by load and measuring performance metrics. Currently only supports GET requests.
 
 ## Usage
 

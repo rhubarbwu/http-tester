@@ -1,4 +1,5 @@
 import asyncio
+from os.path import exists
 from random import uniform
 from statistics import mean
 from time import time
@@ -80,6 +81,38 @@ class Tester:
 
         print()
 
+    def write_to_json(self, output_file: str = None):
+        import json
+
+        if output_file is None:
+            output_file = f"./results-{time()}.json"
+
+        results = {
+            "address": self.address,
+            "duration": self.duration,
+            "rate_limit": self.rate_limit,
+            "timeout": self.timeout,
+            "n_requests": self.n_requests,
+            "n_failure": self.n_errors,
+            "n_success": self.n_requests - self.n_errors,
+        }
+        try:
+            results["min_latency"] = min(self.latencies)
+            results["max_latency"] = max(self.latencies)
+            results["avg_latency"] = mean(self.latencies)
+        except Exception:
+            pass
+
+        if not output_file.endswith(".json"):
+            print(f"Warning -- adding extension: {output_file}(.json)")
+            output_file += ".json"
+
+        try:
+            with open(output_file, "w", encoding="utf-8") as f:
+                json.dump(results, f, ensure_ascii=False, indent=4)
+        except Exception:
+            print(f"Can't write: file {output_file} may not exist.")
+
 
 from argparse import ArgumentParser
 
@@ -110,12 +143,29 @@ def main():
         action="store_true",
         help="Whether to suppress output (e.g. only save to file).",
     )
+
+    parser.add_argument(
+        "-o",
+        "--save_results",
+        action="store_true",
+        help="Whether to store out. Default:  (don't save).",
+    )
+    parser.add_argument(
+        "-f",
+        "--output_file",
+        type=str,
+        default=None,
+        help="Path to JSON file to store results. Default: None (generate base on completion time).",
+    )
+
     args = parser.parse_args()
 
     tester = Tester(args.address, args.duration, args.timeout, args.rate_limit)
     asyncio.run(tester.run())  # may be better way?
     if not args.quiet:
         tester.report()
+    if args.save_results or args.output_file:
+        tester.write_to_json(args.output_file)
 
 
 if __name__ == "__main__":

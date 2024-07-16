@@ -6,5 +6,5 @@ test-docker: Dockerfile tester.py
 	python tester.py http://cslab.cs.toronto.edu -t 5 -to 1 -qps 20
 
 test: tester.py
-	python tester.py http://microsoft.com -t 1 -qps 100
-	python tester.py http://cslab.cs.toronto.edu -t 1 -to 1 -qps 100
+	python tester.py http://microsoft.com -t 1 -qps 100 -o -f results
+	python tester.py http://cslab.cs.toronto.edu -t 1 -to 1 -qps 100 -o
